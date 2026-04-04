@@ -11,6 +11,7 @@ from mjlab.sensor import ContactMatch, ContactSensorCfg
 from mjlab_playground.asset_zoo.robots.booster_t1.t1_constants import get_t1_robot_cfg
 from mjlab_playground.getup import mdp
 from mjlab_playground.getup.getup_env_cfg import make_getup_env_cfg
+from mjlab_playground.getup.mdp.actions import SettleRelativeJointPositionActionCfg
 
 # From reference t1_getup.py and confirmed via qpos[2]=0.665 at home keyframe.
 # Waist body is 0.1155m below trunk (XML offset), so 0.665 - 0.1155 ≈ 0.55.
@@ -117,8 +118,6 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   cfg.events["reset_fallen_or_standing"].params["fall_height"] = 0.8
 
-  from mjlab_playground.getup.mdp.actions import SettleRelativeJointPositionActionCfg
-
   assert isinstance(cfg.actions["joint_pos"], SettleRelativeJointPositionActionCfg)
   cfg.actions["joint_pos"].settle_steps = 50  # 1s at 50Hz action rate.
 
@@ -157,6 +156,8 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
           {"step": 900 * 24, "params": {"threshold": 3000.0}},
           {"step": 1200 * 24, "params": {"threshold": 2000.0}},
           {"step": 1500 * 24, "params": {"threshold": 1500.0}},
+          {"step": 1700 * 24, "params": {"threshold": 1000.0}},
+          {"step": 1900 * 24, "params": {"threshold": 700.0}},
         ],
       },
     ),
