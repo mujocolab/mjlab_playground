@@ -59,7 +59,7 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   )
   cfg.metrics["getup_success"].params["desired_height"] = _TORSO_HEIGHT
 
-  # Per-joint posture std: tight hips, medium knees/ankles, loose arms/waist.
+  # Per-joint posture std: tight hips, medium knees and ankles, loose arms and waist.
   cfg.rewards["posture"].params["std"] = {
     r".*_Hip_Roll": 0.08,
     r".*_Hip_Yaw": 0.08,

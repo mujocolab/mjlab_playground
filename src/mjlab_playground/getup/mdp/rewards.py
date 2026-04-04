@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
 
-# Target gravity vector when upright (gravity points down in body frame).
+# Projected gravity in body frame when upright.
 _UP_VEC = torch.tensor([0.0, 0.0, -1.0])
 
 
@@ -131,9 +131,9 @@ class gated_posture_reward:
 class getup_success:
   """Binary success metric: 1 once the robot has stood up, 0 otherwise.
 
-  Latches to 1.0 when the standing condition is first met. Use with
-  ``reduce="last"`` in MetricsTermCfg so the manager reports the final
-  value at episode end, giving a clean 0-to-1 success rate.
+  Latches to 1.0 when the standing condition is first met. Use with ``reduce="last"``
+  in MetricsTermCfg so the manager reports the final value at episode end, giving a
+  clean 0-to-1 success rate.
   """
 
   def __init__(self, cfg: MetricsTermCfg, env: ManagerBasedRlEnv):
@@ -168,8 +168,8 @@ def self_collision_cost(
 ) -> torch.Tensor:
   """Penalize self-collisions.
 
-  Counts substeps where any contact force exceeds *force_threshold*
-  using the sensor's force history.
+  Counts substeps where any contact force exceeds *force_threshold* using the sensor's
+  force history.
   """
   sensor: ContactSensor = env.scene[sensor_name]
   data = sensor.data

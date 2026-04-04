@@ -2,6 +2,11 @@
 
 This module provides a factory function to create a base getup task config.
 Robot-specific configurations call the factory and customize as needed.
+
+Adapted from MuJoCo Playground (https://github.com/google-deepmind/mujoco_playground/).
+
+References:
+  Zakka et al., "MuJoCo Playground", 2025. https://arxiv.org/abs/2502.08844
 """
 
 from mjlab.envs import ManagerBasedRlEnvCfg

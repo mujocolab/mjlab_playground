@@ -26,10 +26,9 @@ def reset_fallen_or_standing(
 ) -> None:
   """Reset robots to either a random fallen configuration or standing.
 
-  With ``fall_probability``, the robot is placed at ``fall_height`` with a
-  random orientation, random joint positions across the full joint range,
-  and random root velocities. Otherwise it starts in the default standing
-  pose.
+  With ``fall_probability``, the robot is placed at ``fall_height`` with a random
+  orientation, random joint positions across the full joint range, and random root
+  velocities. Otherwise it starts in the default standing pose.
 
   Args:
     env: The environment.
@@ -54,8 +53,7 @@ def reset_fallen_or_standing(
   soft_joint_pos_limits = asset.data.soft_joint_pos_limits
   assert soft_joint_pos_limits is not None
 
-  # Decide which envs fall. Store mask so the action term can skip settle
-  # for standing envs.
+  # Sample fall mask and store it so the action term can skip settle for standing envs.
   fall_mask = torch.rand(n, device=env.device) < fall_probability
   if "settle_mask" not in env.extras:
     env.extras["settle_mask"] = torch.zeros(
@@ -63,7 +61,7 @@ def reset_fallen_or_standing(
     )
   env.extras["settle_mask"][env_ids] = fall_mask
 
-  # -- Root state --
+  # Root state.
   root_states = default_root_state[env_ids].clone()
 
   # Fallen: random quaternion, fixed height, random velocities.
@@ -77,12 +75,11 @@ def reset_fallen_or_standing(
     -velocity_range, velocity_range, (n, 6), env.device
   )
 
-  # Standing: default state with env_origins offset and small z bump to
-  # avoid ground penetration on the first frame.
+  # Standing: default state offset to env origin with a small z bump to avoid ground
+  # penetration.
   standing_positions = root_states[:, 0:3] + env.scene.env_origins[env_ids]
   standing_positions[:, 2] += 0.02
 
-  # Combine.
   mask = fall_mask.unsqueeze(-1)
   positions = torch.where(mask, fallen_positions, standing_positions)
   orientations = torch.where(mask, random_quat, root_states[:, 3:7])
@@ -93,7 +90,7 @@ def reset_fallen_or_standing(
   )
   asset.write_root_link_velocity_to_sim(velocities, env_ids=env_ids)
 
-  # -- Joint state --
+  # Joint state.
   joint_limits = soft_joint_pos_limits[env_ids]
   random_joint_pos = sample_uniform(
     joint_limits[..., 0], joint_limits[..., 1], joint_limits[..., 0].shape, env.device
