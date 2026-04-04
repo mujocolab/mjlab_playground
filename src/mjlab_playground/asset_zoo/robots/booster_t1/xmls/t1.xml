@@ -5,7 +5,7 @@
     <material name="light_gray" rgba="0.76 0.76 0.76 1"/>
     <material name="medium_gray" rgba="0.2 0.2 0.2 1"/>
 
-    <mesh file="Trunk.stl"/>
+    <mesh file="Trunk.stl" maxhullvert="45"/>
     <mesh file="H1.stl"/>
     <mesh file="H2.stl"/>
     <mesh file="AL1.stl"/>
@@ -83,14 +83,16 @@
               diaginertia="0.012869 0.012798 0.000620953"/>
             <joint name="Left_Elbow_Pitch" axis="0 1 0" range="-2.27 2.27"/>
             <geom class="visual" mesh="AL3"/>
-            <geom name="left_upper_arm_collision" class="collision" size="0.03 0.075" pos="0 0.05 0" quat="0.707105 0.707108 0 0"/>
+            <geom name="left_upper_arm_collision" class="collision" size="0.03 0.075" pos="0 0.05 0"
+              quat="0.707105 0.707108 0 0"/>
             <body name="left_hand_link" pos="0 0.1471 0">
               <inertial pos="-0.000108 0.109573 0.000591" quat="0.707866 0.706347 -5.22939e-05 -0.000214913"
                 mass="0.327214" diaginertia="0.008159 0.00813104 0.000214962"/>
               <joint name="Left_Elbow_Yaw" axis="0 0 1" range="-2.44 0"/>
               <geom class="visual" mesh="left_hand_link"/>
               <geom name="left_elbow_collision" class="collision" size="0.04" type="sphere"/>
-              <geom name="left_lower_arm_collision" class="collision" size="0.03 0.0875" pos="0 0.13 0" quat="0.707105 0.707108 0 0"/>
+              <geom name="left_lower_arm_collision" class="collision" size="0.03 0.0875" pos="0 0.13 0"
+                quat="0.707105 0.707108 0 0"/>
               <site name="left_hand" pos="0 .215 0"/>
             </body>
           </body>
@@ -112,14 +114,16 @@
               diaginertia="0.012869 0.012798 0.000620953"/>
             <joint name="Right_Elbow_Pitch" axis="0 1 0" range="-2.27 2.27"/>
             <geom class="visual" mesh="AR3"/>
-            <geom name="right_upper_arm_collision" class="collision" size="0.03 0.075" pos="0 -0.05 0" quat="0.707105 0.707108 0 0"/>
+            <geom name="right_upper_arm_collision" class="collision" size="0.03 0.075" pos="0 -0.05 0"
+              quat="0.707105 0.707108 0 0"/>
             <body name="right_hand_link" pos="0 -0.1471 0">
               <inertial pos="-0.000108 -0.109573 0.000591" quat="0.706347 0.707866 0.000214913 5.22939e-05"
                 mass="0.327214" diaginertia="0.008159 0.00813104 0.000214962"/>
               <joint name="Right_Elbow_Yaw" axis="0 0 1" range="0 2.44"/>
               <geom class="visual" mesh="right_hand_link"/>
               <geom name="right_elbow_collision" class="collision" size="0.04" type="sphere"/>
-              <geom name="right_lower_arm_collision" class="collision" size="0.03 0.0875" pos="0 -0.13 0" quat="0.707105 0.707108 0 0"/>
+              <geom name="right_lower_arm_collision" class="collision" size="0.03 0.0875" pos="0 -0.13 0"
+                quat="0.707105 0.707108 0 0"/>
               <site name="right_hand" pos="0 -.215 0"/>
             </body>
           </body>
@@ -130,7 +134,7 @@
           diaginertia="0.00536742 0.005299 0.00474258"/>
         <joint name="Waist" axis="0 0 1" range="-1.57 1.57"/>
         <geom class="visual" mesh="Waist"/>
-        <geom name="waist_collision" class="collision" type="mesh" mesh="Waist"/>
+        <geom name="waist_collision" class="collision" type="sphere" size="0.07" pos="0 0 .01"/>
         <body name="Hip_Pitch_Left" pos="0 0.106 0">
           <inertial pos="0.000534 -0.007296 -0.018083" quat="0.975141 0.2211 0.0145808 0.0017406" mass="1.021"
             diaginertia="0.00180547 0.00145926 0.00125327"/>
@@ -164,7 +168,14 @@
                       diaginertia="0.00269786 0.002385 0.00218714"/>
                     <joint name="Left_Ankle_Roll" axis="1 0 0" range="-0.44 0.44"/>
                     <geom class="visual" mesh="left_foot_link"/>
-                    <geom name="left_foot_collision" mesh="left_foot_link" type="mesh" class="collision"/>
+                    <geom name="left_foot1_collision" type="capsule" size="0.02" class="collision"
+                      fromto="-0.08 -0.03 -0.01 0.09 -0.03 -0.01"/>
+                    <geom name="left_foot2_collision" type="capsule" size="0.02" class="collision"
+                      fromto="-0.08 0.03 -0.01 0.09 0.03 -0.01"/>
+                    <geom name="left_foot3_collision" type="capsule" size="0.02" class="collision"
+                      fromto="-0.08 -0.01 -0.01 0.105 -0.01 -0.01"/>
+                    <geom name="left_foot4_collision" type="capsule" size="0.02" class="collision"
+                      fromto="-0.08 0.01 -0.01 0.105 0.01 -0.01"/>
                     <site name="left_foot"/>
                   </body>
                 </body>
@@ -205,7 +216,14 @@
                       diaginertia="0.00269786 0.002385 0.00218714"/>
                     <joint name="Right_Ankle_Roll" axis="1 0 0" range="-0.44 0.44"/>
                     <geom class="visual" mesh="right_foot_link"/>
-                    <geom name="right_foot_collision" mesh="right_foot_link" type="mesh" class="collision"/>
+                    <geom name="right_foot1_collision" type="capsule" size="0.02" class="collision"
+                      fromto="-0.08 -0.03 -0.01 0.09 -0.03 -0.01"/>
+                    <geom name="right_foot2_collision" type="capsule" size="0.02" class="collision"
+                      fromto="-0.08 0.03 -0.01 0.09 0.03 -0.01"/>
+                    <geom name="right_foot3_collision" type="capsule" size="0.02" class="collision"
+                      fromto="-0.08 -0.01 -0.01 0.105 -0.01 -0.01"/>
+                    <geom name="right_foot4_collision" type="capsule" size="0.02" class="collision"
+                      fromto="-0.08 0.01 -0.01 0.105 0.01 -0.01"/>
                     <site name="right_foot"/>
                   </body>
                 </body>

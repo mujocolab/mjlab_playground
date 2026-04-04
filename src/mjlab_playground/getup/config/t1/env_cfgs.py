@@ -76,7 +76,9 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     "robot", body_names=("Trunk",)
   )
 
-  foot_geom_names = ("left_foot_collision", "right_foot_collision")
+  foot_geom_names = tuple(
+    f"{side}_foot{i}_collision" for side in ("left", "right") for i in range(1, 5)
+  )
   cfg.events["geom_friction_slide"] = EventTermCfg(
     mode="startup",
     func=envs_mdp.dr.geom_friction,

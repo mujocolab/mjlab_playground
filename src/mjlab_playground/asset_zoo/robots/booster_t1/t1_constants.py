@@ -149,7 +149,7 @@ HOME_KEYFRAME = EntityCfg.InitialStateCfg(
 # Collision config.
 ##
 
-_foot_regex = r"^(left|right)_foot_collision$"
+_foot_regex = r"^(left|right)_foot\d+_collision$"
 
 FULL_COLLISION = CollisionCfg(
   geom_names_expr=(".*_collision",),
