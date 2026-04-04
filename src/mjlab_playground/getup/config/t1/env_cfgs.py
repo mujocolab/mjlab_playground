@@ -115,7 +115,12 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     },
   )
 
-  cfg.events["reset_fallen_or_standing"].params["fall_height"] = 1.2
+  cfg.events["reset_fallen_or_standing"].params["fall_height"] = 0.8
+
+  from mjlab_playground.getup.mdp.actions import SettleRelativeJointPositionActionCfg
+
+  assert isinstance(cfg.actions["joint_pos"], SettleRelativeJointPositionActionCfg)
+  cfg.actions["joint_pos"].settle_steps = 50  # 1s at 50Hz action rate.
 
   # Curriculum: delay all stages until after getup is reliably established (~iter 600).
   # Energy thresholds are much higher than Go1 since T1 has 23 joints vs 12.
