@@ -67,7 +67,8 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     r".*_Knee_Pitch": 0.15,
     r".*_Ankle_Pitch": 0.2,
     r".*_Ankle_Roll": 0.2,
-    r"(Waist|AAHead_yaw|Head_pitch|.*_Shoulder.*|.*_Elbow.*)": 0.5,
+    r"(AAHead_yaw|Head_pitch)": 0.15,
+    r"(Waist|.*_Shoulder.*|.*_Elbow.*)": 0.5,
   }
 
   cfg.viewer.body_name = "Trunk"
