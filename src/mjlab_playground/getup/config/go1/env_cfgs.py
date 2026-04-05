@@ -21,8 +21,6 @@ def unitree_go1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   robot_cfg = get_go1_robot_cfg()
 
-  # Can't have frictionless body contacts for getup, so upgrade all
-  # bodies to condim=3 and feet to condim=6.
   _foot_regex = "^[FR][LR]_foot_collision$"
   robot_cfg.collisions = (
     CollisionCfg(
@@ -35,8 +33,6 @@ def unitree_go1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   )
 
   cfg.scene.entities = {"robot": robot_cfg}
-
-  cfg.sim.njmax = 200
 
   # Self-collision sensor (history_length matches decimation=4).
   self_collision_cfg = ContactSensorCfg(
@@ -62,8 +58,7 @@ def unitree_go1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     params={"sensor_name": self_collision_cfg.name},
   )
 
-  # Per-joint posture std: tight hips (prevent splay), medium thighs,
-  # looser calves.
+  # Per-joint posture std: tight hips (prevent splay), medium thighs, looser calves.
   cfg.rewards["posture"].params["std"] = {
     r".*(FR|FL|RR|RL)_hip_joint.*": 0.05,
     r".*(FR|FL|RR|RL)_thigh_joint.*": 0.1,

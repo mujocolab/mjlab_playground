@@ -24,8 +24,6 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   cfg.scene.entities = {"robot": get_t1_robot_cfg()}
 
-  cfg.sim.njmax = 200
-
   # Self-collision sensor.
   self_collision_cfg = ContactSensorCfg(
     name="self_collision",
@@ -168,13 +166,3 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.events["reset_fallen_or_standing"].params["fall_probability"] = 1.0
 
   return cfg
-
-
-if __name__ == "__main__":
-  cfg = booster_t1_getup_env_cfg()
-
-  import mujoco.viewer as viewer
-  from mjlab.scene import Scene
-
-  scene = Scene(cfg.scene, "cpu")
-  viewer.launch(scene.spec.compile())

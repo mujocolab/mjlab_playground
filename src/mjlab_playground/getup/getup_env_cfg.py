@@ -43,8 +43,7 @@ def make_getup_env_cfg() -> ManagerBasedRlEnvCfg:
       noise=Unoise(n_min=-0.2, n_max=0.2),
     ),
     "projected_gravity": ObservationTermCfg(
-      func=mdp.projected_gravity,
-      noise=Unoise(n_min=-0.05, n_max=0.05),
+      func=mdp.projected_gravity, noise=Unoise(n_min=-0.05, n_max=0.05)
     ),
     "joint_pos": ObservationTermCfg(
       func=mdp.joint_pos_rel,
@@ -52,8 +51,7 @@ def make_getup_env_cfg() -> ManagerBasedRlEnvCfg:
       params={"biased": True},
     ),
     "joint_vel": ObservationTermCfg(
-      func=mdp.joint_vel_rel,
-      noise=Unoise(n_min=-1.5, n_max=1.5),
+      func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5)
     ),
     "actions": ObservationTermCfg(func=mdp.last_action),
   }
@@ -152,10 +150,7 @@ def make_getup_env_cfg() -> ManagerBasedRlEnvCfg:
   ##
 
   rewards = {
-    "orientation": RewardTermCfg(
-      func=mdp.orientation_reward,
-      weight=1.0,
-    ),
+    "orientation": RewardTermCfg(func=mdp.orientation_reward, weight=1.0),
     "torso_height": RewardTermCfg(
       func=mdp.height_reward,
       weight=1.0,
@@ -224,8 +219,7 @@ def make_getup_env_cfg() -> ManagerBasedRlEnvCfg:
   terminations = {
     "time_out": TerminationTermCfg(func=mdp.time_out, time_out=True),
     "energy": TerminationTermCfg(
-      func=mdp.energy_termination,
-      params={"threshold": float("inf")},
+      func=mdp.energy_termination, params={"threshold": float("inf")}
     ),
   }
 
@@ -256,7 +250,7 @@ def make_getup_env_cfg() -> ManagerBasedRlEnvCfg:
       azimuth=90.0,
     ),
     sim=SimulationCfg(
-      njmax=100,
+      njmax=200,
       mujoco=MujocoCfg(
         timestep=0.005,
         iterations=10,

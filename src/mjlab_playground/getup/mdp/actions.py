@@ -19,14 +19,14 @@ if TYPE_CHECKING:
 class SettleRelativeJointPositionActionCfg(RelativeJointPositionActionCfg):
   """RelativeJointPositionActionCfg that disables actions for the first N steps.
 
-  Since the robot is dropped from a height in a random configuration, actions
-  are suppressed until ``settle_steps`` env steps have passed, allowing the
-  robot to land and settle before the policy takes over.
+  Since the robot is dropped from a height in a random configuration, actions are
+  suppressed until ``settle_steps`` env steps have passed, allowing the robot to land
+  and settle before the policy takes over.
   """
 
   settle_steps: int = 0
-  """Number of env steps after reset during which the policy action is
-  ignored and the robot holds its current position. Set to 0 to disable."""
+  """Number of env steps after reset during which the policy action is ignored and the
+  robot holds its current position. Set to 0 to disable."""
 
   def build(self, env: ManagerBasedRlEnv) -> SettleRelativeJointPositionAction:
     return SettleRelativeJointPositionAction(self, env)
