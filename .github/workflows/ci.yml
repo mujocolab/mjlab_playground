@@ -1,0 +1,69 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'Makefile'
+      - 'LICENSE'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'Makefile'
+      - 'LICENSE'
+
+env:
+  UV_FROZEN: "1"
+
+jobs:
+  lint-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          version: "0.9.27"
+      - name: Run lint
+        run: uvx ruff@0.14.14 check --diff
+      - name: Run format
+        run: uvx ruff@0.14.14 format --diff
+
+  tests:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          version: "0.9.27"
+      - name: Restore Warp kernel cache
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/warp
+          key: warp-kernels-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'src/**/*.py') }}
+          restore-keys: |
+            warp-kernels-${{ runner.os }}-${{ runner.arch }}-
+      - name: Test
+        run: uv run pytest tests/ -v
+
+  pyright:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          version: "0.9.27"
+      - name: Type check
+        run: uv run pyright

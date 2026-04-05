@@ -11,5 +11,9 @@ format:
 type:
 	uv run pyright
 
+.PHONY: test
+test:
+	uv run pytest tests/ -v
+
 .PHONY: check
 check: format type

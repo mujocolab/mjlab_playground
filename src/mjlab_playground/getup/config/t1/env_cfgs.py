@@ -88,7 +88,7 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       "asset_cfg": SceneEntityCfg("robot", geom_names=(".*_collision",)),
       "operation": "abs",
       "axes": [0],
-      "ranges": (0.3, 1.2),
+      "ranges": (0.3, 1.5),
       "shared_random": True,
     },
   )

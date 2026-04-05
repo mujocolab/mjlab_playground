@@ -157,6 +157,7 @@ FULL_COLLISION = CollisionCfg(
   solref=(0.01, 1),
   condim={_foot_regex: 6, ".*_collision": 3},
   friction={_foot_regex: (1, 5e-3, 5e-4), ".*_collision": (0.6,)},
+  priority=1,
 )
 
 ##

@@ -30,6 +30,7 @@ def unitree_go1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       solref=(0.01, 1),
       condim={_foot_regex: 6, ".*_collision": 3},
       friction={_foot_regex: (1, 5e-3, 5e-4), ".*_collision": (0.6,)},
+      priority=1,
     ),
   )
 
@@ -82,7 +83,7 @@ def unitree_go1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       "asset_cfg": SceneEntityCfg("robot", geom_names=(".*_collision",)),
       "operation": "abs",
       "axes": [0],
-      "ranges": (0.3, 1.2),
+      "ranges": (0.3, 1.5),
       "shared_random": True,
     },
   )
