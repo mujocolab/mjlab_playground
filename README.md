@@ -6,6 +6,7 @@ A collection of tasks built with [mjlab](https://github.com/mujocolab/mjlab), st
 
 | Task ID | Robot | Description | Preview |
 |---------|-------|-------------|---------|
+| **Getup** | | | |
 | `Mjlab-Getup-Flat-Unitree-Go1` | Unitree Go1 | Fall recovery on flat terrain | <img src="https://raw.githubusercontent.com/mujocolab/mjlab_playground/assets/go1_getup_teaser.gif" width="200"/> |
 | `Mjlab-Getup-Flat-Booster-T1` | Booster T1 | Fall recovery on flat terrain | <img src="https://raw.githubusercontent.com/mujocolab/mjlab_playground/assets/t1_getup_teaser.gif" width="200"/> |
 
@@ -27,6 +28,14 @@ Play back a trained policy:
 ```bash
 uv run play <task-id>
 ```
+
+### Getup training
+
+On a single NVIDIA 5090, the Go1 getup task converges in ~2 minutes and T1 in ~8 minutes, but we continue training with a curriculum that progressively tightens action rate, joint velocity, and power penalties to produce smoother, safer policies.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mujocolab/mjlab_playground/assets/training_curves.png" width="80%"/>
+</p>
 
 ## Citation
 
