@@ -1163,7 +1163,7 @@ wheels = [
 [[package]]
 name = "mjlab"
 version = "1.2.0"
-source = { git = "https://github.com/mujocolab/mjlab?rev=e2a405a8ddf8176a2873834b63fcf3e5c388aa80#e2a405a8ddf8176a2873834b63fcf3e5c388aa80" }
+source = { git = "https://github.com/mujocolab/mjlab?rev=f7fdb163b590e980865e59a5633ff5e1143553bd#f7fdb163b590e980865e59a5633ff5e1143553bd" }
 dependencies = [
     { name = "imageio-ffmpeg" },
     { name = "mediapy" },
@@ -1212,7 +1212,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mjlab", extras = ["cu128"], git = "https://github.com/mujocolab/mjlab?rev=e2a405a8ddf8176a2873834b63fcf3e5c388aa80" },
+    { name = "mjlab", extras = ["cu128"], git = "https://github.com/mujocolab/mjlab?rev=f7fdb163b590e980865e59a5633ff5e1143553bd" },
     { name = "torch", marker = "sys_platform != 'darwin'", specifier = ">=2.7.0,<2.10.0", index = "https://download.pytorch.org/whl/cu128" },
     { name = "torch", marker = "sys_platform == 'darwin'", specifier = ">=2.7.0,<2.10.0" },
 ]
