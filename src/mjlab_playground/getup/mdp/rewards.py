@@ -11,6 +11,7 @@ from mjlab.managers.metrics_manager import MetricsTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.tasks.velocity.mdp.rewards import self_collision_cost  # noqa: F401
+from mjlab.utils.lab_api.math import quat_apply_inverse
 from mjlab.utils.lab_api.string import resolve_matching_names_values
 
 if TYPE_CHECKING:
@@ -22,13 +23,43 @@ _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
 _UP_VEC = torch.tensor([0.0, 0.0, -1.0])
 
 
+def joint_vel_hinge(
+  env: ManagerBasedRlEnv,
+  threshold: float,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Penalize joint velocities exceeding a threshold (hinge/relu penalty).
+
+  Unlike joint_vel_l2 which penalizes all motion, this is zero below `threshold`
+  and quadratic on the excess above it. This lets the policy move freely at normal
+  speeds while strongly penalizing violent velocity spikes.
+  """
+  asset: Entity = env.scene[asset_cfg.name]
+  vel = asset.data.joint_vel[:, asset_cfg.joint_ids]
+  excess = torch.clamp(torch.abs(vel) - threshold, min=0.0)
+  return torch.sum(excess**2, dim=-1)
+
+
 def orientation_reward(
   env: ManagerBasedRlEnv,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> torch.Tensor:
-  """Reward for upright orientation."""
+  """Reward for upright orientation.
+
+  If asset_cfg has body_names, uses that body's orientation. Otherwise falls
+  back to the root body's projected_gravity_b.
+  """
   asset: Entity = env.scene[asset_cfg.name]
-  gravity = asset.data.projected_gravity_b
+  if asset_cfg.body_names is not None:
+    gravity_w = torch.tensor([0.0, 0.0, -1.0], device=env.device).expand(
+      env.num_envs, -1
+    )
+    body_ids = asset_cfg.body_ids
+    assert isinstance(body_ids, list)
+    quat = asset.data.body_link_quat_w[:, body_ids[0]]  # (num_envs, 4)
+    gravity = quat_apply_inverse(quat, gravity_w)
+  else:
+    gravity = asset.data.projected_gravity_b
   up = _UP_VEC.to(gravity.device)
   error = torch.sum(torch.square(up - gravity), dim=-1)
   return torch.exp(-2.0 * error)
@@ -46,8 +77,18 @@ def height_reward(
   return (torch.exp(clamped) - 1.0) / (math.exp(desired_height) - 1.0)
 
 
-def _is_upright(asset: Entity, orientation_threshold: float) -> torch.Tensor:
-  gravity = asset.data.projected_gravity_b
+def _is_upright(
+  asset: Entity,
+  orientation_threshold: float,
+  body_ids: list[int] | None = None,
+) -> torch.Tensor:
+  if body_ids is not None:
+    quat = asset.data.body_link_quat_w[:, body_ids[0]]
+    gravity = quat_apply_inverse(
+      quat, torch.tensor([0.0, 0.0, -1.0], device=quat.device).expand(quat.shape[0], -1)
+    )
+  else:
+    gravity = asset.data.projected_gravity_b
   up = _UP_VEC.to(gravity.device)
   error = torch.sum(torch.square(up - gravity), dim=-1)
   return (error < orientation_threshold).float()
@@ -90,7 +131,9 @@ class gated_posture_reward:
   ) -> torch.Tensor:
     del std  # Resolved in __init__.
     asset: Entity = env.scene[asset_cfg.name]
-    gate = _is_upright(asset, orientation_threshold)
+    body_ids = asset_cfg.body_ids if asset_cfg.body_names is not None else None
+    assert body_ids is None or isinstance(body_ids, list)
+    gate = _is_upright(asset, orientation_threshold, body_ids)
     current_joint_pos = asset.data.joint_pos[:, asset_cfg.joint_ids]
     desired_joint_pos = self.default_joint_pos[:, asset_cfg.joint_ids]
     error_squared = torch.square(current_joint_pos - desired_joint_pos)
@@ -118,8 +161,10 @@ class getup_success:
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
   ) -> torch.Tensor:
     asset: Entity = env.scene[asset_cfg.name]
-    standing = _is_upright(asset, orientation_threshold) * _is_at_desired_height(
-      asset, desired_height, height_tolerance
-    )
+    body_ids = asset_cfg.body_ids if asset_cfg.body_names is not None else None
+    assert body_ids is None or isinstance(body_ids, list)
+    standing = _is_upright(
+      asset, orientation_threshold, body_ids
+    ) * _is_at_desired_height(asset, desired_height, height_tolerance)
     self._stood_up = torch.maximum(self._stood_up, standing)
     return self._stood_up

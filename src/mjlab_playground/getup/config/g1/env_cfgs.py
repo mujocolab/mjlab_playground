@@ -1,0 +1,318 @@
+"""Unitree G1 getup environment configuration."""
+
+from mjlab.actuator import BuiltinPositionActuatorCfg
+from mjlab.asset_zoo.robots import get_g1_robot_cfg
+from mjlab.asset_zoo.robots.unitree_g1.g1_constants import (
+  ACTUATOR_4010,
+  ACTUATOR_5020,
+  ACTUATOR_7520_14,
+  ACTUATOR_7520_22,
+  HOME_KEYFRAME,
+)
+from mjlab.entity import EntityArticulationInfoCfg
+from mjlab.envs import ManagerBasedRlEnvCfg
+from mjlab.envs import mdp as envs_mdp
+from mjlab.managers.curriculum_manager import CurriculumTermCfg
+from mjlab.managers.event_manager import EventTermCfg
+from mjlab.managers.observation_manager import ObservationTermCfg
+from mjlab.managers.reward_manager import RewardTermCfg
+from mjlab.managers.scene_entity_config import SceneEntityCfg
+from mjlab.sensor import ContactMatch, ContactSensorCfg
+from mjlab.utils.noise import UniformNoiseCfg as Unoise
+
+from mjlab_playground.getup import mdp
+from mjlab_playground.getup.getup_env_cfg import make_getup_env_cfg
+from mjlab_playground.getup.mdp.actions import SettleRelativeJointPositionActionCfg
+
+##
+# Actuator config at 5 Hz.
+# Note: lower frequency = lower stiffness = larger 0.25*effort/stiffness action scale.
+# 3 Hz gives 3.9–6.1 rad scales (too large, causes "do nothing" local optimum).
+# 5 Hz gives 1.4–2.2 rad scales (confirmed working in run 4jf73zrh).
+##
+
+_NATURAL_FREQ = 5.0 * 2.0 * 3.1415926535
+_DAMPING_RATIO = 2.0
+
+
+def _kp(act) -> float:
+  return act.reflected_inertia * _NATURAL_FREQ**2
+
+
+def _kv(act) -> float:
+  return 2.0 * _DAMPING_RATIO * act.reflected_inertia * _NATURAL_FREQ
+
+
+_G1_ARTICULATION_5HZ = EntityArticulationInfoCfg(
+  actuators=(
+    BuiltinPositionActuatorCfg(
+      target_names_expr=(
+        ".*_elbow_joint",
+        ".*_shoulder_pitch_joint",
+        ".*_shoulder_roll_joint",
+        ".*_shoulder_yaw_joint",
+        ".*_wrist_roll_joint",
+      ),
+      stiffness=_kp(ACTUATOR_5020),
+      damping=_kv(ACTUATOR_5020),
+      effort_limit=ACTUATOR_5020.effort_limit,
+      armature=ACTUATOR_5020.reflected_inertia,
+    ),
+    BuiltinPositionActuatorCfg(
+      target_names_expr=(".*_hip_pitch_joint", ".*_hip_yaw_joint", "waist_yaw_joint"),
+      stiffness=_kp(ACTUATOR_7520_14),
+      damping=_kv(ACTUATOR_7520_14),
+      effort_limit=ACTUATOR_7520_14.effort_limit,
+      armature=ACTUATOR_7520_14.reflected_inertia,
+    ),
+    BuiltinPositionActuatorCfg(
+      target_names_expr=(".*_hip_roll_joint", ".*_knee_joint"),
+      stiffness=_kp(ACTUATOR_7520_22),
+      damping=_kv(ACTUATOR_7520_22),
+      effort_limit=ACTUATOR_7520_22.effort_limit,
+      armature=ACTUATOR_7520_22.reflected_inertia,
+    ),
+    BuiltinPositionActuatorCfg(
+      target_names_expr=(".*_wrist_pitch_joint", ".*_wrist_yaw_joint"),
+      stiffness=_kp(ACTUATOR_4010),
+      damping=_kv(ACTUATOR_4010),
+      effort_limit=ACTUATOR_4010.effort_limit,
+      armature=ACTUATOR_4010.reflected_inertia,
+    ),
+    # Waist pitch/roll and ankles are 4-bar linkages with 2x 5020 actuators.
+    BuiltinPositionActuatorCfg(
+      target_names_expr=("waist_pitch_joint", "waist_roll_joint"),
+      stiffness=_kp(ACTUATOR_5020) * 2,
+      damping=_kv(ACTUATOR_5020) * 2,
+      effort_limit=ACTUATOR_5020.effort_limit * 2,
+      armature=ACTUATOR_5020.reflected_inertia * 2,
+    ),
+    BuiltinPositionActuatorCfg(
+      target_names_expr=(".*_ankle_pitch_joint", ".*_ankle_roll_joint"),
+      stiffness=_kp(ACTUATOR_5020) * 2,
+      damping=_kv(ACTUATOR_5020) * 2,
+      effort_limit=ACTUATOR_5020.effort_limit * 2,
+      armature=ACTUATOR_5020.reflected_inertia * 2,
+    ),
+  ),
+  soft_joint_pos_limit_factor=0.9,
+)
+
+
+##
+# Action scale.
+##
+
+# 0.25 * effort_limit / stiffness: at action=1.0, joint moves 25% of max-effort displacement.
+G1_ACTION_SCALE_5HZ: dict[str, float] = {}
+for _a in _G1_ARTICULATION_5HZ.actuators:
+  assert isinstance(_a, BuiltinPositionActuatorCfg)
+  assert _a.effort_limit is not None
+  for _n in _a.target_names_expr:
+    G1_ACTION_SCALE_5HZ[_n] = 0.25 * _a.effort_limit / _a.stiffness
+
+##
+# Heights.
+##
+
+# Derived from home keyframe via forward kinematics (see print_home_heights.py).
+_TORSO_HEIGHT = 0.8277  # torso_link z at home pose
+_PELVIS_HEIGHT = 0.7837  # pelvis z at home pose
+
+
+def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 getup task configuration."""
+  cfg = make_getup_env_cfg()
+
+  cfg.sim.nconmax = 75
+
+  robot_cfg = get_g1_robot_cfg()
+  robot_cfg.init_state = HOME_KEYFRAME  # Posture reward targets standing pose.
+  robot_cfg.articulation = _G1_ARTICULATION_5HZ
+  cfg.scene.entities = {"robot": robot_cfg}
+
+  # Self-collision sensor (pelvis is G1 root).
+  self_collision_cfg = ContactSensorCfg(
+    name="self_collision",
+    primary=ContactMatch(mode="subtree", pattern="pelvis", entity="robot"),
+    secondary=ContactMatch(mode="subtree", pattern="pelvis", entity="robot"),
+    fields=("found", "force"),
+    reduce="none",
+    num_slots=1,
+    history_length=4,
+  )
+  cfg.scene.sensors = (cfg.scene.sensors or ()) + (self_collision_cfg,)
+
+  cfg.rewards["self_collisions"] = RewardTermCfg(
+    func=mdp.self_collision_cost,
+    weight=-0.1,
+    params={"sensor_name": self_collision_cfg.name},
+  )
+
+  # Torso + pelvis height. Pelvis reward prevents "sitting" local minimum where
+  # torso_link is high but pelvis stays near the ground.
+  cfg.rewards["torso_height"].params["desired_height"] = _TORSO_HEIGHT
+  cfg.rewards["torso_height"].params["asset_cfg"] = SceneEntityCfg(
+    "robot", body_names=("torso_link",)
+  )
+  cfg.rewards["pelvis_height"] = RewardTermCfg(
+    func=mdp.height_reward,
+    weight=1.0,
+    params={
+      "desired_height": _PELVIS_HEIGHT,
+      "asset_cfg": SceneEntityCfg("robot", body_names=("pelvis",)),
+    },
+  )
+  cfg.metrics["getup_success"].params["desired_height"] = _PELVIS_HEIGHT
+  cfg.metrics["getup_success"].params["asset_cfg"] = SceneEntityCfg(
+    "robot", body_names=("torso_link",)
+  )
+
+  # Per-joint posture std: tight hips, medium knees and ankles, loose arms and waist.
+  cfg.rewards["posture"].params["asset_cfg"] = SceneEntityCfg(
+    "robot", joint_names=(".*",), body_names=("torso_link",)
+  )
+  cfg.rewards["posture"].params["std"] = {
+    r".*_hip_roll_joint": 0.08,
+    r".*_hip_yaw_joint": 0.08,
+    r".*_hip_pitch_joint": 0.12,
+    r".*_knee_joint": 0.15,
+    r".*_ankle_pitch_joint": 0.2,
+    r".*_ankle_roll_joint": 0.2,
+    r"(waist_.*|.*_shoulder.*|.*_elbow.*|.*_wrist.*)": 0.5,
+  }
+
+  cfg.rewards["orientation"].params["asset_cfg"] = SceneEntityCfg(
+    "robot", body_names=("torso_link",)
+  )
+
+  _torso_cfg = SceneEntityCfg("robot", body_names=("torso_link",))
+  cfg.observations["actor"].terms["projected_gravity"] = ObservationTermCfg(
+    func=mdp.body_projected_gravity,
+    params={"asset_cfg": _torso_cfg},
+    noise=Unoise(n_min=-0.05, n_max=0.05),
+  )
+  cfg.observations["critic"].terms["projected_gravity"] = ObservationTermCfg(
+    func=mdp.body_projected_gravity,
+    params={"asset_cfg": _torso_cfg},
+    noise=Unoise(n_min=-0.05, n_max=0.05),
+  )
+
+  cfg.viewer.body_name = "torso_link"
+
+  cfg.events["base_com"].params["asset_cfg"] = SceneEntityCfg(
+    "robot", body_names=("torso_link",)
+  )
+
+  # G1 has 7 foot collision geoms per foot (left/right_foot1-7_collision).
+  foot_geom_names = tuple(
+    f"{side}_foot{i}_collision" for side in ("left", "right") for i in range(1, 8)
+  )
+  cfg.events["geom_friction_slide"] = EventTermCfg(
+    mode="startup",
+    func=envs_mdp.dr.geom_friction,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", geom_names=(".*_collision",)),
+      "operation": "abs",
+      "axes": [0],
+      "ranges": (0.3, 1.5),
+      "shared_random": True,
+    },
+  )
+  cfg.events["foot_friction_spin"] = EventTermCfg(
+    mode="startup",
+    func=envs_mdp.dr.geom_friction,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", geom_names=foot_geom_names),
+      "operation": "abs",
+      "distribution": "log_uniform",
+      "axes": [1],
+      "ranges": (1e-4, 2e-2),
+      "shared_random": True,
+    },
+  )
+  cfg.events["foot_friction_roll"] = EventTermCfg(
+    mode="startup",
+    func=envs_mdp.dr.geom_friction,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", geom_names=foot_geom_names),
+      "operation": "abs",
+      "distribution": "log_uniform",
+      "axes": [2],
+      "ranges": (1e-5, 5e-3),
+      "shared_random": True,
+    },
+  )
+
+  # G1 is taller than go1 — needs more clearance when placed fallen.
+  cfg.events["reset_fallen_or_standing"].params["fall_height"] = 0.8
+
+  assert isinstance(cfg.actions["joint_pos"], SettleRelativeJointPositionActionCfg)
+  cfg.actions["joint_pos"].scale = G1_ACTION_SCALE_5HZ
+  cfg.actions["joint_pos"].settle_steps = 50  # 1s at 50Hz action rate.
+  cfg.terminations["energy"].params["settle_steps"] = 50
+
+  # Torque penalty: starts at 0, activates with action_rate/joint_vel at iter 1500.
+  # Replace flat joint_vel_l2 with a hinge penalty: zero below threshold, quadratic
+  # above it. Lets the policy move freely at normal speeds while penalizing violent spikes.
+  cfg.rewards["joint_vel_hinge"] = RewardTermCfg(
+    func=mdp.joint_vel_hinge, weight=0.0, params={"threshold": 2.0}
+  )
+
+  # joint_torques_l2 sums squared actuator forces — at ~30 Nm average across 29 joints
+  # the raw value is ~26000, so weight must be small.
+  cfg.rewards["joint_torques_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=0.0)
+
+  cfg.curriculum = {
+    # All three smoothness penalties activate together at iter 1500, after the policy
+    # has learned to get up. Energy termination is removed — action_rate, joint_vel,
+    # and torque penalties are the sole drivers of softness.
+    # Policy converges by iter ~700 (confirmed in run cj80ek3s, std=0.989).
+    # Start regularization at iter 1000 instead of 1500 — saves 500 iters and gives
+    # more time for the full curriculum to run.
+    "action_rate_weight": CurriculumTermCfg(
+      func=mdp.reward_curriculum,
+      params={
+        "reward_name": "action_rate_l2",
+        "stages": [
+          {"step": 0, "weight": -0.01},
+          {"step": 1000 * 24, "weight": -0.05},
+          {"step": 1500 * 24, "weight": -0.1},
+          {"step": 2000 * 24, "weight": -0.2},
+        ],
+      },
+    ),
+    "joint_vel_weight": CurriculumTermCfg(
+      func=mdp.reward_curriculum,
+      params={
+        "reward_name": "joint_vel_hinge",
+        "stages": [
+          {"step": 0, "weight": -0.0001},
+          {"step": 1000 * 24, "weight": -0.001},
+          {"step": 1500 * 24, "weight": -0.005},
+          {"step": 2000 * 24, "weight": -0.01},
+          {"step": 2500 * 24, "weight": -0.02},
+        ],
+      },
+    ),
+    "torque_weight": CurriculumTermCfg(
+      func=mdp.reward_curriculum,
+      params={
+        "reward_name": "joint_torques_l2",
+        "stages": [
+          {"step": 0, "weight": 0.0},
+          {"step": 1000 * 24, "weight": -1e-6},
+          {"step": 1500 * 24, "weight": -5e-6},
+          {"step": 2000 * 24, "weight": -1e-5},
+          {"step": 2500 * 24, "weight": -2e-5},
+          {"step": 3000 * 24, "weight": -3e-5},
+        ],
+      },
+    ),
+  }
+
+  if play:
+    cfg.observations["actor"].enable_corruption = False
+    cfg.events["reset_fallen_or_standing"].params["fall_probability"] = 1.0
+
+  return cfg
