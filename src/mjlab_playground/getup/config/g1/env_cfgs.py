@@ -13,11 +13,11 @@ from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
 from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
-# from mjlab.managers.observation_manager import ObservationTermCfg
+from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg
-# from mjlab.utils.noise import UniformNoiseCfg as Unoise
+from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from mjlab_playground.getup import mdp
 from mjlab_playground.getup.getup_env_cfg import make_getup_env_cfg
@@ -168,17 +168,19 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     "robot", body_names=("torso_link",)
   )
 
-  # _torso_cfg = SceneEntityCfg("robot", body_names=("torso_link",))
-  # cfg.observations["actor"].terms["projected_gravity"] = ObservationTermCfg(
-  #   func=mdp.body_projected_gravity,
-  #   params={"asset_cfg": _torso_cfg},
-  #   noise=Unoise(n_min=-0.05, n_max=0.05),
-  # )
-  # cfg.observations["critic"].terms["projected_gravity"] = ObservationTermCfg(
-  #   func=mdp.body_projected_gravity,
-  #   params={"asset_cfg": _torso_cfg},
-  #   noise=Unoise(n_min=-0.05, n_max=0.05),
-  # )
+  # Override projected_gravity to use torso_link instead of pelvis (root).
+  # G1's 3-DOF waist decouples pelvis and torso orientation — the pelvis gravity
+  # signal is misleading; the policy needs to see torso uprightness directly.
+  _torso_cfg = SceneEntityCfg("robot", body_names=("torso_link",))
+  cfg.observations["actor"].terms["projected_gravity"] = ObservationTermCfg(
+    func=mdp.body_projected_gravity,
+    params={"asset_cfg": _torso_cfg},
+    noise=Unoise(n_min=-0.05, n_max=0.05),
+  )
+  cfg.observations["critic"].terms["projected_gravity"] = ObservationTermCfg(
+    func=mdp.body_projected_gravity,
+    params={"asset_cfg": _torso_cfg},
+  )
 
   cfg.viewer.body_name = "torso_link"
 
