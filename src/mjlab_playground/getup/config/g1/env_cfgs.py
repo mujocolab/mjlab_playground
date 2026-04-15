@@ -7,18 +7,17 @@ from mjlab.asset_zoo.robots.unitree_g1.g1_constants import (
   ACTUATOR_5020,
   ACTUATOR_7520_14,
   ACTUATOR_7520_22,
-  HOME_KEYFRAME,
 )
 from mjlab.entity import EntityArticulationInfoCfg
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
-from mjlab.managers.curriculum_manager import CurriculumTermCfg
+# from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
-from mjlab.managers.observation_manager import ObservationTermCfg
+# from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg
-from mjlab.utils.noise import UniformNoiseCfg as Unoise
+# from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from mjlab_playground.getup import mdp
 from mjlab_playground.getup.getup_env_cfg import make_getup_env_cfg
@@ -26,9 +25,6 @@ from mjlab_playground.getup.mdp.actions import SettleRelativeJointPositionAction
 
 ##
 # Actuator config at 5 Hz.
-# Note: lower frequency = lower stiffness = larger 0.25*effort/stiffness action scale.
-# 3 Hz gives 3.9–6.1 rad scales (too large, causes "do nothing" local optimum).
-# 5 Hz gives 1.4–2.2 rad scales (confirmed working in run 4jf73zrh).
 ##
 
 _NATURAL_FREQ = 5.0 * 2.0 * 3.1415926535
@@ -98,26 +94,13 @@ _G1_ARTICULATION_5HZ = EntityArticulationInfoCfg(
   soft_joint_pos_limit_factor=0.9,
 )
 
-
-##
-# Action scale.
-##
-
-# 0.25 * effort_limit / stiffness: at action=1.0, joint moves 25% of max-effort displacement.
-G1_ACTION_SCALE_5HZ: dict[str, float] = {}
-for _a in _G1_ARTICULATION_5HZ.actuators:
-  assert isinstance(_a, BuiltinPositionActuatorCfg)
-  assert _a.effort_limit is not None
-  for _n in _a.target_names_expr:
-    G1_ACTION_SCALE_5HZ[_n] = 0.25 * _a.effort_limit / _a.stiffness
-
 ##
 # Heights.
 ##
 
-# Derived from home keyframe via forward kinematics (see print_home_heights.py).
-_TORSO_HEIGHT = 0.8277  # torso_link z at home pose
-_PELVIS_HEIGHT = 0.7837  # pelvis z at home pose
+# Derived from home keyframe.
+_TORSO_HEIGHT = 0.98
+_PELVIS_HEIGHT = 0.68
 
 
 def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
@@ -127,7 +110,6 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.sim.nconmax = 75
 
   robot_cfg = get_g1_robot_cfg()
-  robot_cfg.init_state = HOME_KEYFRAME  # Posture reward targets standing pose.
   robot_cfg.articulation = _G1_ARTICULATION_5HZ
   cfg.scene.entities = {"robot": robot_cfg}
 
@@ -149,13 +131,13 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     params={"sensor_name": self_collision_cfg.name},
   )
 
-  # Torso + pelvis height. Pelvis reward prevents "sitting" local minimum where
+  # Torso + waist (pelvis) height. Waist reward prevents "sitting" local minimum where
   # torso_link is high but pelvis stays near the ground.
   cfg.rewards["torso_height"].params["desired_height"] = _TORSO_HEIGHT
   cfg.rewards["torso_height"].params["asset_cfg"] = SceneEntityCfg(
     "robot", body_names=("torso_link",)
   )
-  cfg.rewards["pelvis_height"] = RewardTermCfg(
+  cfg.rewards["waist_height"] = RewardTermCfg(
     func=mdp.height_reward,
     weight=1.0,
     params={
@@ -186,17 +168,17 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     "robot", body_names=("torso_link",)
   )
 
-  _torso_cfg = SceneEntityCfg("robot", body_names=("torso_link",))
-  cfg.observations["actor"].terms["projected_gravity"] = ObservationTermCfg(
-    func=mdp.body_projected_gravity,
-    params={"asset_cfg": _torso_cfg},
-    noise=Unoise(n_min=-0.05, n_max=0.05),
-  )
-  cfg.observations["critic"].terms["projected_gravity"] = ObservationTermCfg(
-    func=mdp.body_projected_gravity,
-    params={"asset_cfg": _torso_cfg},
-    noise=Unoise(n_min=-0.05, n_max=0.05),
-  )
+  # _torso_cfg = SceneEntityCfg("robot", body_names=("torso_link",))
+  # cfg.observations["actor"].terms["projected_gravity"] = ObservationTermCfg(
+  #   func=mdp.body_projected_gravity,
+  #   params={"asset_cfg": _torso_cfg},
+  #   noise=Unoise(n_min=-0.05, n_max=0.05),
+  # )
+  # cfg.observations["critic"].terms["projected_gravity"] = ObservationTermCfg(
+  #   func=mdp.body_projected_gravity,
+  #   params={"asset_cfg": _torso_cfg},
+  #   noise=Unoise(n_min=-0.05, n_max=0.05),
+  # )
 
   cfg.viewer.body_name = "torso_link"
 
@@ -244,72 +226,73 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     },
   )
 
-  # G1 is taller than go1 — needs more clearance when placed fallen.
+  # G1 needs more clearance when placed fallen.
   cfg.events["reset_fallen_or_standing"].params["fall_height"] = 0.8
 
   assert isinstance(cfg.actions["joint_pos"], SettleRelativeJointPositionActionCfg)
-  cfg.actions["joint_pos"].scale = G1_ACTION_SCALE_5HZ
   cfg.actions["joint_pos"].settle_steps = 50  # 1s at 50Hz action rate.
   cfg.terminations["energy"].params["settle_steps"] = 50
 
-  # Torque penalty: starts at 0, activates with action_rate/joint_vel at iter 1500.
-  # Replace flat joint_vel_l2 with a hinge penalty: zero below threshold, quadratic
-  # above it. Lets the policy move freely at normal speeds while penalizing violent spikes.
-  cfg.rewards["joint_vel_hinge"] = RewardTermCfg(
-    func=mdp.joint_vel_hinge, weight=0.0, params={"threshold": 2.0}
-  )
+  cfg.curriculum = {}  # Disable curriculum for now.
 
-  # joint_torques_l2 sums squared actuator forces — at ~30 Nm average across 29 joints
-  # the raw value is ~26000, so weight must be small.
-  cfg.rewards["joint_torques_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=0.0)
+  # # Torque penalty: starts at 0, activates with action_rate/joint_vel at iter 1500.
+  # # Replace flat joint_vel_l2 with a hinge penalty: zero below threshold, quadratic
+  # # above it. Lets the policy move freely at normal speeds while penalizing violent spikes.
+  # cfg.rewards["joint_vel_hinge"] = RewardTermCfg(
+  #   func=mdp.joint_vel_hinge, weight=0.0, params={"threshold": 2.0}
+  # )
 
-  cfg.curriculum = {
-    # All three smoothness penalties activate together at iter 1500, after the policy
-    # has learned to get up. Energy termination is removed — action_rate, joint_vel,
-    # and torque penalties are the sole drivers of softness.
-    # Policy converges by iter ~700 (confirmed in run cj80ek3s, std=0.989).
-    # Start regularization at iter 1000 instead of 1500 — saves 500 iters and gives
-    # more time for the full curriculum to run.
-    "action_rate_weight": CurriculumTermCfg(
-      func=mdp.reward_curriculum,
-      params={
-        "reward_name": "action_rate_l2",
-        "stages": [
-          {"step": 0, "weight": -0.01},
-          {"step": 1000 * 24, "weight": -0.05},
-          {"step": 1500 * 24, "weight": -0.1},
-          {"step": 2000 * 24, "weight": -0.2},
-        ],
-      },
-    ),
-    "joint_vel_weight": CurriculumTermCfg(
-      func=mdp.reward_curriculum,
-      params={
-        "reward_name": "joint_vel_hinge",
-        "stages": [
-          {"step": 0, "weight": -0.0001},
-          {"step": 1000 * 24, "weight": -0.001},
-          {"step": 1500 * 24, "weight": -0.005},
-          {"step": 2000 * 24, "weight": -0.01},
-          {"step": 2500 * 24, "weight": -0.02},
-        ],
-      },
-    ),
-    "torque_weight": CurriculumTermCfg(
-      func=mdp.reward_curriculum,
-      params={
-        "reward_name": "joint_torques_l2",
-        "stages": [
-          {"step": 0, "weight": 0.0},
-          {"step": 1000 * 24, "weight": -1e-6},
-          {"step": 1500 * 24, "weight": -5e-6},
-          {"step": 2000 * 24, "weight": -1e-5},
-          {"step": 2500 * 24, "weight": -2e-5},
-          {"step": 3000 * 24, "weight": -3e-5},
-        ],
-      },
-    ),
-  }
+  # # joint_torques_l2 sums squared actuator forces — at ~30 Nm average across 29 joints
+  # # the raw value is ~26000, so weight must be small.
+  # cfg.rewards["joint_torques_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=0.0)
+
+  # cfg.curriculum = {
+  #   # All three smoothness penalties activate together at iter 1500, after the policy
+  #   # has learned to get up. Energy termination is removed — action_rate, joint_vel,
+  #   # and torque penalties are the sole drivers of softness.
+  #   # Policy converges by iter ~700 (confirmed in run cj80ek3s, std=0.989).
+  #   # Start regularization at iter 1000 instead of 1500 — saves 500 iters and gives
+  #   # more time for the full curriculum to run.
+  #   "action_rate_weight": CurriculumTermCfg(
+  #     func=mdp.reward_curriculum,
+  #     params={
+  #       "reward_name": "action_rate_l2",
+  #       "stages": [
+  #         {"step": 0, "weight": -0.01},
+  #         {"step": 1000 * 24, "weight": -0.05},
+  #         {"step": 1500 * 24, "weight": -0.1},
+  #         {"step": 2000 * 24, "weight": -0.2},
+  #       ],
+  #     },
+  #   ),
+  #   "joint_vel_weight": CurriculumTermCfg(
+  #     func=mdp.reward_curriculum,
+  #     params={
+  #       "reward_name": "joint_vel_hinge",
+  #       "stages": [
+  #         {"step": 0, "weight": -0.0001},
+  #         {"step": 1000 * 24, "weight": -0.001},
+  #         {"step": 1500 * 24, "weight": -0.005},
+  #         {"step": 2000 * 24, "weight": -0.01},
+  #         {"step": 2500 * 24, "weight": -0.02},
+  #       ],
+  #     },
+  #   ),
+  #   "torque_weight": CurriculumTermCfg(
+  #     func=mdp.reward_curriculum,
+  #     params={
+  #       "reward_name": "joint_torques_l2",
+  #       "stages": [
+  #         {"step": 0, "weight": 0.0},
+  #         {"step": 1000 * 24, "weight": -1e-6},
+  #         {"step": 1500 * 24, "weight": -5e-6},
+  #         {"step": 2000 * 24, "weight": -1e-5},
+  #         {"step": 2500 * 24, "weight": -2e-5},
+  #         {"step": 3000 * 24, "weight": -3e-5},
+  #       ],
+  #     },
+  #   ),
+  # }
 
   if play:
     cfg.observations["actor"].enable_corruption = False
