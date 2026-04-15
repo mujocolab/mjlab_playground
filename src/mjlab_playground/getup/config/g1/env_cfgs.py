@@ -11,7 +11,7 @@ from mjlab.asset_zoo.robots.unitree_g1.g1_constants import (
 from mjlab.entity import EntityArticulationInfoCfg
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
-# from mjlab.managers.curriculum_manager import CurriculumTermCfg
+from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
 # from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
@@ -233,11 +233,7 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.actions["joint_pos"].settle_steps = 50  # 1s at 50Hz action rate.
   cfg.terminations["energy"].params["settle_steps"] = 50
 
-  cfg.curriculum = {}  # Disable curriculum for now.
-
-  # # Torque penalty: starts at 0, activates with action_rate/joint_vel at iter 1500.
-  # # Replace flat joint_vel_l2 with a hinge penalty: zero below threshold, quadratic
-  # # above it. Lets the policy move freely at normal speeds while penalizing violent spikes.
+  # # Torque penalty (future): replace joint_vel_l2 with a hinge once getup is stable.
   # cfg.rewards["joint_vel_hinge"] = RewardTermCfg(
   #   func=mdp.joint_vel_hinge, weight=0.0, params={"threshold": 2.0}
   # )
@@ -246,53 +242,35 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # # the raw value is ~26000, so weight must be small.
   # cfg.rewards["joint_torques_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=0.0)
 
-  # cfg.curriculum = {
-  #   # All three smoothness penalties activate together at iter 1500, after the policy
-  #   # has learned to get up. Energy termination is removed — action_rate, joint_vel,
-  #   # and torque penalties are the sole drivers of softness.
-  #   # Policy converges by iter ~700 (confirmed in run cj80ek3s, std=0.989).
-  #   # Start regularization at iter 1000 instead of 1500 — saves 500 iters and gives
-  #   # more time for the full curriculum to run.
-  #   "action_rate_weight": CurriculumTermCfg(
-  #     func=mdp.reward_curriculum,
-  #     params={
-  #       "reward_name": "action_rate_l2",
-  #       "stages": [
-  #         {"step": 0, "weight": -0.01},
-  #         {"step": 1000 * 24, "weight": -0.05},
-  #         {"step": 1500 * 24, "weight": -0.1},
-  #         {"step": 2000 * 24, "weight": -0.2},
-  #       ],
-  #     },
-  #   ),
-  #   "joint_vel_weight": CurriculumTermCfg(
-  #     func=mdp.reward_curriculum,
-  #     params={
-  #       "reward_name": "joint_vel_hinge",
-  #       "stages": [
-  #         {"step": 0, "weight": -0.0001},
-  #         {"step": 1000 * 24, "weight": -0.001},
-  #         {"step": 1500 * 24, "weight": -0.005},
-  #         {"step": 2000 * 24, "weight": -0.01},
-  #         {"step": 2500 * 24, "weight": -0.02},
-  #       ],
-  #     },
-  #   ),
-  #   "torque_weight": CurriculumTermCfg(
-  #     func=mdp.reward_curriculum,
-  #     params={
-  #       "reward_name": "joint_torques_l2",
-  #       "stages": [
-  #         {"step": 0, "weight": 0.0},
-  #         {"step": 1000 * 24, "weight": -1e-6},
-  #         {"step": 1500 * 24, "weight": -5e-6},
-  #         {"step": 2000 * 24, "weight": -1e-5},
-  #         {"step": 2500 * 24, "weight": -2e-5},
-  #         {"step": 3000 * 24, "weight": -3e-5},
-  #       ],
-  #     },
-  #   ),
-  # }
+  # Smoothness curriculum: mirrors T1 shape but delayed ~200 iters to give G1 more time
+  # to learn getup before penalties kick in. action_rate raw value is ~67 at weight=-0.01
+  # (29 joints vs T1's fewer), so keep final weight at -0.1 matching T1 — policy adapts.
+  cfg.curriculum = {
+    "action_rate_weight": CurriculumTermCfg(
+      func=mdp.reward_curriculum,
+      params={
+        "reward_name": "action_rate_l2",
+        "stages": [
+          {"step": 0, "weight": -0.01},
+          {"step": 800 * 24, "weight": -0.05},
+          {"step": 1200 * 24, "weight": -0.08},
+          {"step": 1600 * 24, "weight": -0.1},
+        ],
+      },
+    ),
+    "joint_vel_weight": CurriculumTermCfg(
+      func=mdp.reward_curriculum,
+      params={
+        "reward_name": "joint_vel_l2",
+        "stages": [
+          {"step": 0, "weight": 0.0},
+          {"step": 1000 * 24, "weight": -0.005},
+          {"step": 1400 * 24, "weight": -0.008},
+          {"step": 1800 * 24, "weight": -0.01},
+        ],
+      },
+    ),
+  }
 
   if play:
     cfg.observations["actor"].enable_corruption = False
