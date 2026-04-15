@@ -247,32 +247,33 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # Smoothness curriculum: mirrors T1 shape but delayed ~200 iters to give G1 more time
   # to learn getup before penalties kick in. action_rate raw value is ~67 at weight=-0.01
   # (29 joints vs T1's fewer), so keep final weight at -0.1 matching T1 — policy adapts.
-  cfg.curriculum = {
-    "action_rate_weight": CurriculumTermCfg(
-      func=mdp.reward_curriculum,
-      params={
-        "reward_name": "action_rate_l2",
-        "stages": [
-          {"step": 0, "weight": -0.01},
-          {"step": 800 * 24, "weight": -0.05},
-          {"step": 1200 * 24, "weight": -0.08},
-          {"step": 1600 * 24, "weight": -0.1},
-        ],
-      },
-    ),
-    "joint_vel_weight": CurriculumTermCfg(
-      func=mdp.reward_curriculum,
-      params={
-        "reward_name": "joint_vel_l2",
-        "stages": [
-          {"step": 0, "weight": 0.0},
-          {"step": 1000 * 24, "weight": -0.005},
-          {"step": 1400 * 24, "weight": -0.008},
-          {"step": 1800 * 24, "weight": -0.01},
-        ],
-      },
-    ),
-  }
+  # cfg.curriculum = {
+  #   "action_rate_weight": CurriculumTermCfg(
+  #     func=mdp.reward_curriculum,
+  #     params={
+  #       "reward_name": "action_rate_l2",
+  #       "stages": [
+  #         {"step": 0, "weight": -0.01},
+  #         {"step": 800 * 24, "weight": -0.05},
+  #         {"step": 1200 * 24, "weight": -0.08},
+  #         {"step": 1600 * 24, "weight": -0.1},
+  #       ],
+  #     },
+  #   ),
+  #   "joint_vel_weight": CurriculumTermCfg(
+  #     func=mdp.reward_curriculum,
+  #     params={
+  #       "reward_name": "joint_vel_l2",
+  #       "stages": [
+  #         {"step": 0, "weight": 0.0},
+  #         {"step": 1000 * 24, "weight": -0.005},
+  #         {"step": 1400 * 24, "weight": -0.008},
+  #         {"step": 1800 * 24, "weight": -0.01},
+  #       ],
+  #     },
+  #   ),
+  # }
+  cfg.curriculum = {}
 
   if play:
     cfg.observations["actor"].enable_corruption = False
