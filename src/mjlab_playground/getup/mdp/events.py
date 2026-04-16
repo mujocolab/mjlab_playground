@@ -22,6 +22,7 @@ def reset_fallen_or_standing(
   fall_probability: float = 0.6,
   fall_height: float = 0.5,
   velocity_range: float = 0.5,
+  joint_range_scale: float = 1.0,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> None:
   """Reset robots to either a random fallen configuration or standing.
@@ -36,6 +37,8 @@ def reset_fallen_or_standing(
     fall_probability: Probability of starting in a fallen configuration.
     fall_height: Height (m) to place the robot when fallen.
     velocity_range: Root velocity sampled uniformly in [-range, range].
+    joint_range_scale: Scale factor in (0, 1] applied to the soft joint range
+      symmetrically around the midpoint. 1.0 = full range; 0.5 = half range.
     asset_cfg: Asset configuration.
   """
   if env_ids is None:
@@ -92,9 +95,9 @@ def reset_fallen_or_standing(
 
   # Joint state.
   joint_limits = soft_joint_pos_limits[env_ids]
-  random_joint_pos = sample_uniform(
-    joint_limits[..., 0], joint_limits[..., 1], joint_limits[..., 0].shape, env.device
-  )
+  mid = (joint_limits[..., 0] + joint_limits[..., 1]) * 0.5
+  half = (joint_limits[..., 1] - joint_limits[..., 0]) * 0.5 * joint_range_scale
+  random_joint_pos = sample_uniform(mid - half, mid + half, mid.shape, env.device)
 
   joint_pos = torch.where(mask, random_joint_pos, default_joint_pos[env_ids].clone())
   joint_vel = torch.where(

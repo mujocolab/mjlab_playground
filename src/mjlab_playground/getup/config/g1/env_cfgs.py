@@ -11,7 +11,6 @@ from mjlab.asset_zoo.robots.unitree_g1.g1_constants import (
 from mjlab.entity import EntityArticulationInfoCfg
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
-from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
@@ -99,8 +98,8 @@ _G1_ARTICULATION_5HZ = EntityArticulationInfoCfg(
 ##
 
 # Derived from home keyframe.
-_TORSO_HEIGHT = 0.98
-_PELVIS_HEIGHT = 0.68
+_TORSO_HEIGHT = 0.804  # torso_link xpos z (body frame origin, not COM)
+_PELVIS_HEIGHT = 0.760  # pelvis xpos z (body frame origin, not COM)
 
 
 def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
@@ -108,6 +107,8 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg = make_getup_env_cfg()
 
   cfg.sim.nconmax = 75
+  cfg.sim.mujoco.cone = "pyramidal"
+  cfg.sim.mujoco.impratio = 1.0
 
   robot_cfg = get_g1_robot_cfg()
   robot_cfg.articulation = _G1_ARTICULATION_5HZ
@@ -188,10 +189,10 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     "robot", body_names=("torso_link",)
   )
 
-  # G1 has 7 foot collision geoms per foot (left/right_foot1-7_collision).
-  foot_geom_names = tuple(
-    f"{side}_foot{i}_collision" for side in ("left", "right") for i in range(1, 8)
-  )
+  # # G1 has 7 foot collision geoms per foot (left/right_foot1-7_collision).
+  # foot_geom_names = tuple(
+  #   f"{side}_foot{i}_collision" for side in ("left", "right") for i in range(1, 8)
+  # )
   cfg.events["geom_friction_slide"] = EventTermCfg(
     mode="startup",
     func=envs_mdp.dr.geom_friction,
@@ -203,42 +204,38 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       "shared_random": True,
     },
   )
-  cfg.events["foot_friction_spin"] = EventTermCfg(
-    mode="startup",
-    func=envs_mdp.dr.geom_friction,
-    params={
-      "asset_cfg": SceneEntityCfg("robot", geom_names=foot_geom_names),
-      "operation": "abs",
-      "distribution": "log_uniform",
-      "axes": [1],
-      "ranges": (1e-4, 2e-2),
-      "shared_random": True,
-    },
-  )
-  cfg.events["foot_friction_roll"] = EventTermCfg(
-    mode="startup",
-    func=envs_mdp.dr.geom_friction,
-    params={
-      "asset_cfg": SceneEntityCfg("robot", geom_names=foot_geom_names),
-      "operation": "abs",
-      "distribution": "log_uniform",
-      "axes": [2],
-      "ranges": (1e-5, 5e-3),
-      "shared_random": True,
-    },
-  )
+  # cfg.events["foot_friction_spin"] = EventTermCfg(
+  #   mode="startup",
+  #   func=envs_mdp.dr.geom_friction,
+  #   params={
+  #     "asset_cfg": SceneEntityCfg("robot", geom_names=foot_geom_names),
+  #     "operation": "abs",
+  #     "distribution": "log_uniform",
+  #     "axes": [1],
+  #     "ranges": (1e-4, 2e-2),
+  #     "shared_random": True,
+  #   },
+  # )
+  # cfg.events["foot_friction_roll"] = EventTermCfg(
+  #   mode="startup",
+  #   func=envs_mdp.dr.geom_friction,
+  #   params={
+  #     "asset_cfg": SceneEntityCfg("robot", geom_names=foot_geom_names),
+  #     "operation": "abs",
+  #     "distribution": "log_uniform",
+  #     "axes": [2],
+  #     "ranges": (1e-5, 5e-3),
+  #     "shared_random": True,
+  #   },
+  # )
 
   # G1 needs more clearance when placed fallen.
   cfg.events["reset_fallen_or_standing"].params["fall_height"] = 0.8
+  cfg.events["reset_fallen_or_standing"].params["joint_range_scale"] = 0.5
 
   assert isinstance(cfg.actions["joint_pos"], SettleRelativeJointPositionActionCfg)
-  cfg.actions["joint_pos"].settle_steps = 50  # 1s at 50Hz action rate.
-  cfg.terminations["energy"].params["settle_steps"] = 50
-
-  # # Torque penalty (future): replace joint_vel_l2 with a hinge once getup is stable.
-  # cfg.rewards["joint_vel_hinge"] = RewardTermCfg(
-  #   func=mdp.joint_vel_hinge, weight=0.0, params={"threshold": 2.0}
-  # )
+  cfg.actions["joint_pos"].settle_steps = 30
+  cfg.terminations["energy"].params["settle_steps"] = 30
 
   # # joint_torques_l2 sums squared actuator forces — at ~30 Nm average across 29 joints
   # # the raw value is ~26000, so weight must be small.
@@ -273,7 +270,42 @@ def unitree_g1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   #     },
   #   ),
   # }
+  # cfg.curriculum = {
+  #   "action_rate_weight": CurriculumTermCfg(
+  #     func=mdp.reward_curriculum,
+  #     params={
+  #       "reward_name": "action_rate_l2",
+  #       "stages": [
+  #         {"step": 0,          "weight": -0.001},
+  #         {"step": 1500 * 24,  "weight": -0.003},
+  #         {"step": 2500 * 24,  "weight": -0.006},
+  #         {"step": 3500 * 24,  "weight": -0.01},
+  #         {"step": 4000 * 24,  "weight": -0.05},
+  #       ],
+  #     },
+  #   ),
+  #   "joint_vel_weight": CurriculumTermCfg(
+  #     func=mdp.reward_curriculum,
+  #     params={
+  #       "reward_name": "joint_vel_l2",
+  #       "stages": [
+  #         {"step": 0,          "weight": -0.0},
+  #         {"step": 2000 * 24,  "weight": -0.005},
+  #         {"step": 2500 * 24,  "weight": -0.008},
+  #         {"step": 3000 * 24,  "weight": -0.01},
+  #         {"step": 3500 * 24,  "weight": -0.1},
+  #       ],
+  #     },
+  #   ),
+  # }
   cfg.curriculum = {}
+  cfg.rewards["action_rate_l2"].weight = -0.01
+  cfg.rewards["joint_vel_l2"].weight = -0.0
+  cfg.rewards["joint_vel_hinge"] = RewardTermCfg(
+    func=mdp.joint_vel_hinge,
+    weight=-0.1,
+    params={"threshold": 2.0},  # rad/s
+  )
 
   if play:
     cfg.observations["actor"].enable_corruption = False
